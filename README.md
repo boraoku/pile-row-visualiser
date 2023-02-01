@@ -9,10 +9,10 @@ Here are some example input and resultant outputs:
 <table>
 <tr>
 <th>
-⌀1200mm secant pile wall, 1000mm c/c spacing (200mm overcut), and a verticality tolerance of 1:150.
+⌀1200mm secant pile wall, 1000mm c/c spacing (200mm overlap) and verticality tolerance of 1:150
 </th>
 <th>
-⌀273mm micro piles (tubes), 373mm c/c spacing (100mm gaps), and a verticality tolerance of 1:100.
+⌀273mm micro piles (tubes), 373mm c/c spacing (100mm gaps) and verticality tolerance of 1:100
 </th>
 </tr>
 <tr>
