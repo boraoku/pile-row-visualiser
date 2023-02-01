@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Diff</key>
+	<array>
+		<dict>
+			<key>ModifiedContent</key>
+			<string>import SwiftUI
+import PlaygroundSupport
+
+// Arrow location: center, inside, outside and none
+public enum ArrowLocation {
+    case center
+    case outside
+    case inside
+    case none
+}
+
+struct PileRow {
+    var pileDia_mm: Double
+    var pileSpacing_mm: Double
+    var verticality_1in: Double
+    var scale: Double = 0.1 // 0&lt;scale&lt;1 for drawing
+}
+
+let arrow = ArrowLocation.inside
+
+struct PileRowView: View {
+    
+    var pileRow: PileRow
+    var depth_m: Double
+    var angleSet: [Double]
+    var noPiles: Int
+    
+    // Real measurements
+    
+    func pileDeviate_mm() -&gt; Double {
+        return ceil(depth_m * 1000.0 / pileRow.verticality_1in ) 
+    }
+    
+    func minOverlap() -&gt; Double {
+        return pileRow.pileDia_mm - pileRow.pileSpacing_mm - 2 * pileDeviate_mm()
+    }
+    
+    func overlapLabel() -&gt; String {
+        
+        let minOverlap = minOverlap()
+        let almostNoneWhenLessThan = 10.0 //mm
+        
+        var labelOpening = "seperation"
+        //if spacing is already greater than pile diameter, call this 
+        if pileRow.pileSpacing_mm &gt; pileRow.pileDia_mm {
+            labelOpening = "gap"
+        }
+        
+        if minOverlap &gt; almostNoneWhenLessThan {
+            return "At depth of \(depth_m.stringWith(1)) m, a minimum overlap is \(minOverlap.stringWith(0))mm."
+        }
+        
+        if minOverlap &lt; 0.0 {
+            return "At depth of \(depth_m.stringWith(1)) m, a maximum " + labelOpening + 
+            " of \((-minOverlap).stringWith(0))mm."
+        }
+        
+        // minOverlap &lt;= almostNoneWhenLessThan is almost
+        return "At depth of \(depth_m.stringWith(1)) m, potentially almost no overlap."
+    }
+    
+    // Scaled for drawing
+    
+    func pileDia() -&gt; Double {
+        return pileRow.pileDia_mm * pileRow.scale
+    }
+    func pileClearSpacing() -&gt; Double {
+        return (pileRow.pileSpacing_mm - pileRow.pileDia_mm) * pileRow.scale
+    }
+    
+    func pileFrame() -&gt; CGSize {
+        return CGSize(width: pileDia(), height: pileDia())
+    }
+    
+    func pileDeviate() -&gt; Double {
+        return pileDeviate_mm() * pileRow.scale
+    }
+    
+    func randomPileDevivate(_ index:Int) -&gt; CGSize {
+        //use randomised the deviation angle
+        //have the total deviation on pisagor
+        return CGSize(width: pileDeviate() * sin(angleSet[index]),
+                      height: pileDeviate() * cos(angleSet[index]))
+    }
+    
+    func rowPadding() -&gt; Double {
+        return pileDeviate() + pileDia() * 0.5
+    }
+    
+    func potentialMinOverlap()  -&gt; Double {
+        return (pileRow.pileSpacing_mm - ceil(depth_m * 1000.0 / pileRow.verticality_1in))
+    }
+    
+    func arrowOffset(_ index:Int) -&gt; CGSize {
+        
+        var locationModifier: Double = 0.0
+        switch arrow {
+        case .inside:
+            locationModifier = pileDia() * 0.5 
+        case .outside:
+            locationModifier = -pileDia() * 0.5
+        default:
+            locationModifier = 0.0 //for center or none 
+        }
+        
+        //use randomised the deviation angle
+        //have the total deviation on pisagor
+        return CGSize(width: (pileDeviate() * 0.5 + locationModifier ) * sin(angleSet[index]),
+                      height: (pileDeviate() * 0.5 + locationModifier ) * cos(angleSet[index]))
+    }
+    
+    var body: some View {
+        VStack {
+            HStack {
+                Text(overlapLabel())
+                    .font(.largeTitle)
+                    .foregroundColor(.black)
+                Spacer()
+            }
+            HStack(spacing: pileClearSpacing()) {
+                ForEach(0..&lt;noPiles) { index in
+                    ZStack {
+                        
+                        // outline of deviation
+                        Circle()
+                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [6, 6], dashPhase: 0))
+                            .foregroundColor(.black)
+                            .frame(width: pileFrame().width, 
+                                   height: pileFrame().height)
+                            .offset(randomPileDevivate(index))
+                            .zIndex(2*Double(index))
+                        
+                        // fill of deviation
+                        Circle()
+                            .frame(width: pileFrame().width, 
+                                   height: pileFrame().height)
+                            .offset(randomPileDevivate(index))
+                            .zIndex(2*Double(index))
+                            .foregroundColor(Color(red: 1.0, green: 1.0, blue: 0.6))
+                            .opacity(0.5)
+                        
+                        // array for direction and magnitude of deviation
+                        if arrow != .none {
+                            Image(systemName: "arrow.down")
+                                .resizable()
+                                .bold()
+                                .foregroundColor(.red)
+                                .rotationEffect(Angle(radians: -angleSet[index]))
+                                .scaledToFit()
+                                .frame(width: pileDeviate(), 
+                                       height: pileDeviate())
+                                .offset(arrowOffset(index))
+                                .zIndex(3*Double(index))
+                        }
+                        
+                        // original position
+                        Circle()
+                            .foregroundColor(.gray)
+                            .opacity(0.2)
+                            .frame(width: pileFrame().width, 
+                                   height: pileFrame().height)
+                            .zIndex(1*Double(index))
+                    }
+                }
+                .padding(.top, rowPadding() * 0.5)
+                .padding(.bottom, rowPadding())
+            }
+            .overlay(
+                GeometryReader { geometry in
+                    Path { path in
+                        path.move(to: CGPoint(x: -pileFrame().width, y: geometry.size.height / 2))
+                        path.addLine(to: CGPoint(x: geometry.size.width + pileFrame().width, y: geometry.size.height / 2))
+                    }
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [6, 6], dashPhase: 0))
+                    .foregroundColor(.black)
+                })
+        }
+        .padding()
+        .background(Color.white)
+    }
+}
+
+struct PileRowDeviationVisualiser: View {
+    
+    var selectedDesign: PileRow
+    var deviationAngles: [Double] = (1...10).map { _ in Double.random(in: 0...2) * .pi } //an angle for each pile drawn on the row, randomly deviated 10 piles as default
+    var maxDepth_m = 20.0
+    var stepDepth_m = 5.0 //drawing step to max depth
+    
+    func noOfDrawSteps() -&gt; Int {
+        return Int(ceil(maxDepth_m/stepDepth_m))
+    }
+    
+    var body: some View {
+        Group {
+            Text("Pile Row Deviation Visualiser")
+                .font(.largeTitle)
+            ScrollView {
+                VStack(spacing:0.0) {
+                    ForEach(0..&lt;noOfDrawSteps()) { step in 
+                        PileRowView(pileRow: self.selectedDesign, 
+                                    depth_m:stepDepth_m + stepDepth_m * Double(step), 
+                                    angleSet: self.deviationAngles,
+                                    noPiles: self.deviationAngles.count)
+                    }
+                }
+            }.padding().background(.white).shadow(radius: 4.0)
+        }.padding()
+        .onAppear() {
+            print(deviationAngles) // you can use the print out to manually regenerate any drawings above
+        }
+    }
+}
+
+//Secant Pile Wall
+
+ let secantPileWall = PileRow(pileDia_mm: 1200.0, 
+                              pileSpacing_mm: 1000.0, 
+                              verticality_1in: 150.0,
+                              scale: 0.095)
+
+ let deviationAnglesSPW = [6.126836370312905, 2.7330831146085153, 2.145237717799033, 6.041758535853427, 1.8497475489577904, 4.069135071059878, 4.773652952350063, 1.3173348207410416, 5.973476381357126, 2.8205557619173685]
+ 
+ PlaygroundPage.current.setLiveView(PileRowDeviationVisualiser(selectedDesign: secantPileWall
+                                                               ,deviationAngles: deviationAnglesSPW)) //angles can be commented out to generate random angles
+
+
+/*
+//Micro Piles
+ 
+let microPiles = PileRow(pileDia_mm: 273.0, 
+                         pileSpacing_mm: 373.0, 
+                         verticality_1in: 100.0,
+                         scale: 0.25)
+
+let deviationAnglesMP = [0.8829188573971489, 3.835282957828257, 5.861586055157872, 5.355507886091104, 3.3785969048788083, 4.09847791161317, 3.1352525867827894, 4.5919300610574165, 4.737055356272536, 0.40409293476999464]
+
+PlaygroundPage.current.setLiveView(PileRowDeviationVisualiser(selectedDesign: microPiles
+                                                              ,deviationAngles: deviationAnglesMP)) //angles can be commented out to generate random angles
+*/
+</string>
+			<key>ModifiedRange</key>
+			<string>{0, 9070}</string>
+			<key>OriginalContent</key>
+			<string>
+</string>
+			<key>OriginalRange</key>
+			<string>{0, 1}</string>
+		</dict>
+	</array>
+	<key>File</key>
+	<string>Chapters/Chapter1.playgroundchapter/Pages/My Playground.playgroundpage/main.swift</string>
+</dict>
+</plist>
